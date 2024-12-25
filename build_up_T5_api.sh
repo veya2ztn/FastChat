@@ -14,6 +14,9 @@ pids[1]=$!
 # CUDA_VISIBLE_DEVICES=3 python3 -m fastchat.serve.model_worker --model-path /home/niubility2/pretrained_models/PixArt-alpha/t5-v1_1-xxl/ --dtype float32
 # CUDA_VISIBLE_DEVICES=4 python3 -m fastchat.serve.model_worker --model-path /home/niubility2/pretrained_models/PixArt-alpha/t5-v1_1-xxl/ --dtype float32
 
+
+####### VideoScore
+# CUDA_VISIBLE_DEVICES=7 python -m fastchat.serve.model_worker --model-path TIGER-Lab/VideoScore-v1.1 
 ### use follow code test the ollama serve is setup correctly, you may create a is_ollama_build function
 ### curl http://$OLLAMA_HOST/api/embeddings -d '{"model": "jina/jina-embeddings-v2-base-en","prompt": "Llamas are members of the camelid family"}'
 ### setup a loop with timelimit that detect the status for ollama building via is_ollama_build function
