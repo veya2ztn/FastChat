@@ -370,6 +370,7 @@ def load_model(
             raise e
 
     # Load model
+
     model, tokenizer = adapter.load_model(model_path, kwargs)
 
     if (
@@ -1835,6 +1836,34 @@ class SmaugChatAdapter(BaseModelAdapter):
     def get_default_conv_template(self, model_path: str) -> Conversation:
         return get_conv_template("qwen-7b-chat")
 
+from transformers import T5EncoderModel
+class T5encoderAdapter(BaseModelAdapter):
+    """The model adapter for T5 encoder (e.g., google/t5-v1_1-base)"""
+
+    def match(self, model_path: str):
+        return "t5" in model_path.lower()
+
+    def load_model(self, model_path: str, from_pretrained_kwargs: dict):
+        
+        model = T5EncoderModel.from_pretrained(model_path,**from_pretrained_kwargs)
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # model.use_cls_pooling = False
+        model.eval()
+        return model, tokenizer
+        
+
+class VideoScoreAdapter(BaseModelAdapter):
+    """The model adapter for VideoScore (e.g., VideoScore/VideoScore-v1.0)"""
+
+    def match(self, model_path: str):
+        return "videoscore" in model_path.lower()
+    def load_model(self, model_path: str, from_pretrained_kwargs: dict):
+        from mantis.models.idefics2 import Idefics2ForSequenceClassification
+        model = Idefics2ForSequenceClassification.from_pretrained(model_path,torch_dtype=torch.bfloat16).eval()
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # model.use_cls_pooling = False
+        model.eval()
+        return model, tokenizer
 
 class BGEAdapter(BaseModelAdapter):
     """The model adapter for BGE (e.g., BAAI/bge-large-en-v1.5)"""
@@ -2561,6 +2590,8 @@ register_model_adapter(WizardCoderAdapter)
 register_model_adapter(QwenChatAdapter)
 register_model_adapter(AquilaChatAdapter)
 register_model_adapter(BGEAdapter)
+register_model_adapter(T5encoderAdapter)
+register_model_adapter(VideoScoreAdapter)
 register_model_adapter(E5Adapter)
 register_model_adapter(Lamma2ChineseAdapter)
 register_model_adapter(Lamma2ChineseAlpacaAdapter)

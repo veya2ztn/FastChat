@@ -190,13 +190,19 @@ class ModelWorker(BaseModelWorker):
             ret = {"embedding": [], "token_num": 0}
 
             model_type_dict = {
+                "is_t5_xxl": True, #"t5-v1_1-xxl" in str(type(self.model)),
                 "is_llama": "llama" in str(type(self.model)),
                 "is_t5": "t5" in str(type(self.model)),
                 "is_chatglm": "chatglm" in str(type(self.model)),
                 "is_bert": "bert" in str(type(self.model)),
                 "is_robert": "robert" in str(type(self.model)),
             }
-
+#             print(f"""
+#                   {str(type(self.model))}
+#                   {"T5Encoder" in str(type(self.model))}
+# model_type_dict: {model_type_dict}
+# embed_in_truncate: {self.embed_in_truncate}
+# """)
             if self.embed_in_truncate:
                 encoding = tokenizer.batch_encode_plus(
                     params["input"],
@@ -229,9 +235,16 @@ class ModelWorker(BaseModelWorker):
                 all_embeddings = []
                 all_token_num = 0
                 for i in range(0, input_ids.size(1), self.context_len):
+                    
                     chunk_input_ids = input_ids[:, i : i + self.context_len]
                     chunk_attention_mask = attention_mask[:, i : i + self.context_len]
+#                     print(f"""
+# {hasattr(self.model, "use_cls_pooling")}
 
+# chunk_input_ids: {chunk_input_ids}
+# chunk_attention_mask: {chunk_attention_mask}
+
+# """)
                     # add cls token and mask to get cls embedding
                     if (
                         hasattr(self.model, "use_cls_pooling")
@@ -256,22 +269,37 @@ class ModelWorker(BaseModelWorker):
                         chunk_attention_mask = torch.cat(
                             [mask, chunk_attention_mask], dim=-1
                         )
-
-                    chunk_embeddings, token_num = self.__process_embed_chunk(
-                        chunk_input_ids, chunk_attention_mask, **model_type_dict
-                    )
-                    if (
-                        hasattr(self.model, "use_cls_pooling")
-                        and self.model.use_cls_pooling
-                    ):
-                        all_embeddings.append(chunk_embeddings * token_num)
+                    if model_type_dict.get("is_t5_xxl"):
+                        # assert len(chunk_input_ids)==1
+                        # chunk_input_ids = chunk_input_ids[0]
+                        # chunk_input_ids = torch.nn.functional.pad(chunk_input_ids, (0, 800 - len(chunk_input_ids)))
+                        # chunk_input_ids = chunk_input_ids.unsqueeze(0)
+                        # chunk_attention_mask = (chunk_input_ids!=0).to(torch.long)
+                        # chunk_attention_mask = chunk_attention_mask.to(torch.long)
+                        chunk_embeddings = self.model(input_ids=chunk_input_ids, attention_mask=chunk_attention_mask)['last_hidden_state'].detach()
+                        token_num = torch.sum(chunk_attention_mask).item()
+                        all_embeddings.extend(list(chunk_embeddings))
+                        #all_embeddings.extend([chunk_embeddings_single[chunk_attention_mask_single] for chunk_embeddings_single, chunk_attention_mask_single in zip(chunk_embeddings, chunk_attention_mask)])
                     else:
-                        all_embeddings.append(chunk_embeddings)
-                    all_token_num += token_num
+                        chunk_embeddings, token_num = self.__process_embed_chunk(
+                            chunk_input_ids, chunk_attention_mask, **model_type_dict
+                        )
+                        if (
+                            hasattr(self.model, "use_cls_pooling")
+                            and self.model.use_cls_pooling
+                        ):
+                            all_embeddings.append(chunk_embeddings * token_num)
+                        else:
+                            all_embeddings.append(chunk_embeddings)
+                        all_token_num += token_num
+
 
                 all_embeddings_tensor = torch.stack(all_embeddings)
-                embedding = torch.sum(all_embeddings_tensor, dim=0) / all_token_num
-                normalized_embeddings = F.normalize(embedding, p=2, dim=1)
+                if model_type_dict.get("is_t5_xxl"):
+                    normalized_embeddings = all_embeddings_tensor
+                else:
+                    embedding = torch.sum(all_embeddings_tensor, dim=0) / all_token_num
+                    normalized_embeddings = F.normalize(embedding, p=2, dim=1)
 
                 ret["token_num"] = all_token_num
 
